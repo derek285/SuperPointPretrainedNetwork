@@ -431,6 +431,7 @@ class PointTracker(object):
     self.tracks = self.tracks[keep_rows, :]
     # Store the last descriptors.
     self.last_desc = desc.copy()
+    # print(self.last_desc)
     return
 
   def get_tracks(self, min_length):
@@ -660,12 +661,29 @@ if __name__ == '__main__':
 
     # Get a new image.
     img, status = vs.next_frame()
+    # cv2.imshow("cur_f", img)
+    # cv2.waitKey(0)
     if status is False:
       break
 
     # Get points and descriptors.
     start1 = time.time()
     pts, desc, heatmap = fe.run(img)
+
+    # generate a label file for every frame
+    out_f = open("./output_img_label/%05d.txt" % vs.i, 'w')
+    for i in range(pts.shape[1]):
+        # debug
+        # print(i)
+        # print(pts.T[i])
+        # print(desc.T[i])
+
+        #id + pts(x,y,confidence) + descriptor(256*1 tensor, 256 depends on self.net.forward(inp))
+        # str(pts.T[i][0] * 4)  str(pts.T[i][1] * 4). * 4 because my input is 640*480, (640*480///default160*120) get the cord directly
+        out_f.write(str(i) + "," + str(pts.T[i][0]*4) +","+str(pts.T[i][1]*4)+","+str(pts.T[i][2]) + "," +",".join([str(b) for b in desc.T[i]]) + '\n')
+    out_f.close()
+
+
     end1 = time.time()
 
     # Add points and descriptors to the tracker.
@@ -701,32 +719,34 @@ if __name__ == '__main__':
     cv2.putText(out3, 'Raw Point Confidences', font_pt, font, font_sc, font_clr, lineType=16)
 
     # Resize final output.
-    if opt.show_extra:
-      out = np.hstack((out1, out2, out3))
-      out = cv2.resize(out, (3*opt.display_scale*opt.W, opt.display_scale*opt.H))
-    else:
-      out = cv2.resize(out1, (opt.display_scale*opt.W, opt.display_scale*opt.H))
+    # if opt.show_extra:
+    #   out = np.hstack((out1, out2, out3))
+    #   out = cv2.resize(out, (3*opt.display_scale*opt.W, opt.display_scale*opt.H))
+    # else:
+    #   out = cv2.resize(out1, (opt.display_scale*opt.W, opt.display_scale*opt.H))
 
     # Display visualization image to screen.
-    if not opt.no_display:
-      cv2.imshow(win, out)
-      key = cv2.waitKey(opt.waitkey) & 0xFF
-      if key == ord('q'):
-        print('Quitting, \'q\' pressed.')
-        break
+    # if not opt.no_display:
+    #   cv2.imshow(win, out)
+    #   key = cv2.waitKey(opt.waitkey) & 0xFF
+    #   if key == ord('q'):
+    #     print('Quitting, \'q\' pressed.')
+    #     break
 
     # Optionally write images to disk.
-    if opt.write:
-      out_file = os.path.join(opt.write_dir, 'frame_%05d.png' % vs.i)
-      print('Writing image to %s' % out_file)
-      cv2.imwrite(out_file, out)
+    # if opt.write:
+    #   out_file = os.path.join(opt.write_dir, 'frame_%05d.png' % vs.i)
+    #   print('Writing image to %s' % out_file)
+    #   cv2.imwrite(out_file, out)
 
     end = time.time()
     net_t = (1./ float(end1 - start))
     total_t = (1./ float(end - start))
-    if opt.show_extra:
-      print('Processed image %d (net+post_process: %.2f FPS, total: %.2f FPS).'\
-            % (vs.i, net_t, total_t))
+
+    # if opt.show_extra:
+
+    print('Processed image %d (net+post_process: %.2f FPS, total: %.2f FPS).'\
+          % (vs.i, net_t, total_t))
 
   # Close any remaining windows.
   cv2.destroyAllWindows()

@@ -35,21 +35,25 @@ MonoVO:
 This repo depends on a few standard pythonic modules, plus OpenCV and PyTorch. These commands usually work (tested on Mac and Ubuntu) for installing the two libraries:
 
 ```sh
-pip install opencv-python
-pip install torch
+pip3 install opencv-python
+pip3 install torch
 ```
 
 ## Running the Demo
 This demo will run the SuperPoint network on an image sequence and compute points and descriptors from the images, using a helper class called `SuperPointFrontend`. The tracks are formed by the `PointTracker` class which finds sequential pair-wise nearest neighbors using two-way matching of the points' descriptors. The demo script uses a helper class called `VideoStreamer` which can process inputs from three different input streams:
 
+```
 1. A directory of images, such as .png or .jpg
 2. A video file, such as .mp4 or .avi
 3. A USB Webcam
+```
+
+
 
 ### Run the demo on provided directory of images in CPU-mode:
 
 ```sh
-./demo_superpoint.py assets/icl_snippet/
+python3 demo_superpoint.py assets/roadscapes/ --img_glob=*.jpg
 ```
 You should see the following output from the ICL-NUIM sequence snippet:  
 
@@ -58,7 +62,7 @@ You should see the following output from the ICL-NUIM sequence snippet:
 ### Run the demo on provided .mp4 file in GPU-mode:
 
 ```sh
-./demo_superpoint.py assets/nyu_snippet.mp4 --cuda
+python3 demo_superpoint.py /data/007.mp4 --cuda
 ```
 You should see the following output from the NYU sequence snippet:  
 
@@ -67,12 +71,13 @@ You should see the following output from the NYU sequence snippet:
 ### Run a live demo via webcam (id #1) in CPU-mode:
 
 ```sh
-./demo_superpoint.py camera --camid=1
+python3 demo_superpoint.py camera --camid=1
+maybe: python3 demo_superpoint.py camera
 ```
 
 ### Run the demo on a remote GPU (no display) on 640x480 images and write the output to `myoutput/`
 ```sh
-./demo_superpoint.py assets/icl_snippet/ --W=640 --H=480 --no_display --write --write_dir=myoutput/
+python3 demo_superpoint.py assets/icl_snippet/ --W=640 --H=480 --no_display --write --write_dir=myoutput/
 ```
 
 ### Additional useful command line parameters
@@ -89,21 +94,5 @@ You should see the following output from the NYU sequence snippet:
 * Use `--show_extra` to show more computer vision outputs.
 * Press the `q` key to quit.
 
-
-## BibTeX Citation
-```txt
-@inproceedings{detone18superpoint,
-  author    = {Daniel DeTone and
-               Tomasz Malisiewicz and
-               Andrew Rabinovich},
-  title     = {SuperPoint: Self-Supervised Interest Point Detection and Description},
-  booktitle = {CVPR Deep Learning for Visual SLAM Workshop},
-  year      = {2018},
-  url       = {http://arxiv.org/abs/1712.07629}
-}
-```
-
 ## Additional Notes
-* We do not intend to release the SuperPoint training or evaluation code, please do not email us to ask for it.
-* We do not intend to release the Synthetic Shapes dataset used to bootstrap the SuperPoint training, please do not email us to ask for it.
 * We use bi-linear interpolation rather than the bi-cubic interpolation described in the paper to sample the descriptor as it is faster and gave us similar results.
