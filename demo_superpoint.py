@@ -91,7 +91,7 @@ class SuperPointNet(torch.nn.Module):
         # Descriptor Head.
         self.convDa = torch.nn.Conv2d(c4, c5, kernel_size=3, stride=1, padding=1)
         self.convDb = torch.nn.Conv2d(c5, d1, kernel_size=1, stride=1, padding=0)
-
+    
     def forward(self, x):
         """ Forward pass that jointly computes unprocessed point and descriptor
         tensors.
@@ -135,7 +135,7 @@ class SuperPointFrontend(object):
         self.nn_thresh = nn_thresh # L2 descriptor distance for good match.
         self.cell = 8 # Size of each output cell. Keep this fixed.
         self.border_remove = 4 # Remove points this close to the border.
-
+        
         # Load the network in inference mode.
         self.net = SuperPointNet()
         if cuda:
@@ -147,7 +147,7 @@ class SuperPointFrontend(object):
             self.net.load_state_dict(torch.load(weights_path,
                                                 map_location=lambda storage, loc: storage))
         self.net.eval()
-
+    
     def nms_fast(self, in_corners, H, W, dist_thresh):
         """
         Run a faster approximate Non-Max-Suppression on numpy corners shaped:
@@ -212,7 +212,7 @@ class SuperPointFrontend(object):
         out = out[:, inds2]
         out_inds = inds1[inds_keep[inds2]]
         return out, out_inds
-
+    
     def run(self, img):
         """ Process a numpy image to extract points and descriptors.
         Input
@@ -292,7 +292,7 @@ class PointTracker(object):
     tracks with maximum length L, where each row corresponds to:
     row_m = [track_id_m, avg_desc_score_m, point_id_0_m, ..., point_id_L-1_m].
     """
-
+    
     def __init__(self, max_length, nn_thresh):
         if max_length < 2:
             raise ValueError('max_length must be greater than or equal to 2.')
@@ -305,7 +305,7 @@ class PointTracker(object):
         self.tracks = np.zeros((0, self.maxl+2))
         self.track_count = 0
         self.max_score = 9999
-
+    
     def nn_match_two_way(self, desc1, desc2, nn_thresh):
         """
         Performs two-way nearest neighbor matching of two sets of descriptors, such
@@ -349,7 +349,7 @@ class PointTracker(object):
         matches[1, :] = m_idx2
         matches[2, :] = scores
         return matches
-
+    
     def get_offsets(self):
         """ Iterate through list of points and accumulate an offset value. Used to
         index the global point IDs into the list of points.
@@ -365,7 +365,7 @@ class PointTracker(object):
         offsets = np.array(offsets)
         offsets = np.cumsum(offsets)
         return offsets
-
+    
     def update(self, pts, desc):
         """ Add a new set of point and descriptor observations to the tracker.
     
@@ -431,9 +431,9 @@ class PointTracker(object):
         self.tracks = self.tracks[keep_rows, :]
         # Store the last descriptors.
         self.last_desc = desc.copy()
-        # print(self.last_desc)
+        #print(self.last_desc)
         return
-
+    
     def get_tracks(self, min_length):
         """ Retrieve point tracks of a given minimum length.
         Input
@@ -451,7 +451,7 @@ class PointTracker(object):
         keepers = np.logical_and.reduce((valid, good_len, not_headless))
         returned_tracks = self.tracks[keepers, :].copy()
         return returned_tracks
-
+    
     def draw_tracks(self, out, tracks):
         """ Visualize tracks all overlayed on a single image.
         Inputs
@@ -529,7 +529,7 @@ class VideoStreamer(object):
                 self.maxlen = len(self.listing)
                 if self.maxlen == 0:
                     raise IOError('No images were found (maybe bad \'--img_glob\' parameter?)')
-
+    
     def read_image(self, impath, img_size):
         """ Read image as grayscale and resize to img_size.
         Inputs
@@ -546,7 +546,7 @@ class VideoStreamer(object):
         grayim = cv2.resize(grayim, (img_size[1], img_size[0]), interpolation=interp)
         grayim = (grayim.astype('float32') / 255.)
         return grayim
-
+    
     def next_frame(self):
         """ Return the next frame, and increment internal counter.
         Returns
@@ -554,12 +554,12 @@ class VideoStreamer(object):
            status: True or False depending whether image was loaded.
         """
         if self.i == self.maxlen:
-            return (None, False)
+            return (None, 0)
         if self.camera:
             ret, input_image = self.cap.read()
             if ret is False:
                 print('VideoStreamer: Cannot get image from camera (maybe bad --camid?)')
-                return (None, False)
+                return (None, 0)
             if self.video_file:
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.listing[self.i])
             input_image = cv2.resize(input_image, (self.sizer[1], self.sizer[0]),
@@ -568,15 +568,21 @@ class VideoStreamer(object):
             input_image = input_image.astype('float')/255.0
         else:
             image_file = self.listing[self.i]
-            input_image = self.read_image(image_file, self.sizer)
+            print("reading " + image_file)
+            try:
+                input_image = self.read_image(image_file, self.sizer)
+            except:
+                print("reading error:" + image_file)
+                self.i = self.i + 1
+                return(None, 2)
         # Increment internal counter.
         self.i = self.i + 1
         input_image = input_image.astype('float32')
-        return (input_image, True)
+        return (input_image, 1)
 
 
 if __name__ == '__main__':
-
+    
     # Parse command line arguments.
     parser = argparse.ArgumentParser(description='PyTorch SuperPoint Demo.')
     parser.add_argument('input', type=str, default='',
@@ -617,12 +623,14 @@ if __name__ == '__main__':
                         help='Save output frames to a directory (default: False)')
     parser.add_argument('--write_dir', type=str, default='tracker_outputs/',
                         help='Directory where to write output frames (default: tracker_outputs/).')
+    parser.add_argument('--label_dir', type=str, default='label_dir/',
+                        help='Directory where to write output frames (default: tracker_outputs/).')
     opt = parser.parse_args()
     print(opt)
-
+    
     # This class helps load input images from different sources.
     vs = VideoStreamer(opt.input, opt.camid, opt.H, opt.W, opt.skip, opt.img_glob)
-
+    
     print('==> Loading pre-trained network.')
     # This class runs the SuperPoint network and processes its outputs.
     fe = SuperPointFrontend(weights_path=opt.weights_path,
@@ -631,81 +639,82 @@ if __name__ == '__main__':
                             nn_thresh=opt.nn_thresh,
                             cuda=opt.cuda)
     print('==> Successfully loaded pre-trained network.')
-
+    
     # This class helps merge consecutive point matches into tracks.
     tracker = PointTracker(opt.max_length, nn_thresh=fe.nn_thresh)
-
+    
     # Create a window to display the demo.
     if not opt.no_display:
         win = 'SuperPoint Tracker'
         cv2.namedWindow(win)
     else:
         print('Skipping visualization, will not show a GUI.')
-
+    
     # Font parameters for visualizaton.
     font = cv2.FONT_HERSHEY_DUPLEX
     font_clr = (255, 255, 255)
     font_pt = (4, 12)
     font_sc = 0.4
-
+    
     # Create output directory if desired.
     if opt.write:
         print('==> Will write outputs to %s' % opt.write_dir)
         if not os.path.exists(opt.write_dir):
             os.makedirs(opt.write_dir)
-
+    
     print('==> Running Demo.')
     while True:
-
+        
         start = time.time()
-
+        
         # Get a new image.
         img, status = vs.next_frame()
-        # cv2.imshow("cur_f", img)
-        # cv2.waitKey(0)
-        if status is False:
-            break
 
+        if status == 0:
+            break
+        if status == 2:
+            out_f = open(opt.label_dir + "%09d.txt" % (vs.i - 1), 'w')
+            out_f.close()
+            continue
+            
         # Get points and descriptors.
         start1 = time.time()
         pts, desc, heatmap = fe.run(img)
 
-        # generate a label file for every frame
-        out_f = open("./output_img_label/%05d.txt" % vs.i, 'w')
+        if not os.path.exists(opt.label_dir):
+            os.mkdir(opt.label_dir)
+        # print(opt.label_dir +"%09d.txt" % (vs.i-1))
+        out_f = open(opt.label_dir +"%09d.txt" % (vs.i-1), 'w')
         for i in range(pts.shape[1]):
-            # debug
             # print(i)
             # print(pts.T[i])
             # print(desc.T[i])
-
-            #id + pts(x,y,confidence) + descriptor(256*1 tensor, 256 depends on self.net.forward(inp))
-            # str(pts.T[i][0] * 4)  str(pts.T[i][1] * 4). * 4 because my input is 640*480, (640*480///default160*120) get the cord directly
-            out_f.write(str(i) + "," + str(pts.T[i][0]*4) +","+str(pts.T[i][1]*4)+","+str(pts.T[i][2]) + "," +",".join([str(b) for b in desc.T[i]]) + '\n')
+            out_f.write(str(i) + "," + str(pts.T[i][0]*8) +","+str(pts.T[i][1]*6)+","+str(pts.T[i][2]) + "," +",".join([str(b) for b in desc.T[i]]) + '\n')
         out_f.close()
-
-
+        
+        
         end1 = time.time()
-
+        
         # Add points and descriptors to the tracker.
         tracker.update(pts, desc)
-
+        
         # Get tracks for points which were match successfully across all frames.
         tracks = tracker.get_tracks(opt.min_length)
-
+        
         # Primary output - Show point tracks overlayed on top of input image.
         out1 = (np.dstack((img, img, img)) * 255.).astype('uint8')
         tracks[:, 1] /= float(fe.nn_thresh) # Normalize track scores to [0,1].
         tracker.draw_tracks(out1, tracks)
         if opt.show_extra:
             cv2.putText(out1, 'Point Tracks', font_pt, font, font_sc, font_clr, lineType=16)
-
+        
         # Extra output -- Show current point detections.
         out2 = (np.dstack((img, img, img)) * 255.).astype('uint8')
         for pt in pts.T:
             pt1 = (int(round(pt[0])), int(round(pt[1])))
             cv2.circle(out2, pt1, 1, (0, 255, 0), -1, lineType=16)
         cv2.putText(out2, 'Raw Point Detections', font_pt, font, font_sc, font_clr, lineType=16)
-
+        
         # Extra output -- Show the point confidence heatmap.
         if heatmap is not None:
             min_conf = 0.001
@@ -717,14 +726,14 @@ if __name__ == '__main__':
         else:
             out3 = np.zeros_like(out2)
         cv2.putText(out3, 'Raw Point Confidences', font_pt, font, font_sc, font_clr, lineType=16)
-
+        
         # Resize final output.
         # if opt.show_extra:
         #   out = np.hstack((out1, out2, out3))
         #   out = cv2.resize(out, (3*opt.display_scale*opt.W, opt.display_scale*opt.H))
         # else:
         #   out = cv2.resize(out1, (opt.display_scale*opt.W, opt.display_scale*opt.H))
-
+        
         # Display visualization image to screen.
         # if not opt.no_display:
         #   cv2.imshow(win, out)
@@ -732,23 +741,21 @@ if __name__ == '__main__':
         #   if key == ord('q'):
         #     print('Quitting, \'q\' pressed.')
         #     break
-
+        
         # Optionally write images to disk.
         # if opt.write:
         #   out_file = os.path.join(opt.write_dir, 'frame_%05d.png' % vs.i)
         #   print('Writing image to %s' % out_file)
         #   cv2.imwrite(out_file, out)
-
+        
         end = time.time()
         net_t = (1./ float(end1 - start))
         total_t = (1./ float(end - start))
-
-        # if opt.show_extra:
-
-        print('Processed image %d (net+post_process: %.2f FPS, total: %.2f FPS).' \
-              % (vs.i, net_t, total_t))
-
+        if opt.show_extra:
+            print('Processed image %d (net+post_process: %.2f FPS, total: %.2f FPS).' \
+                  % (vs.i, net_t, total_t))
+    
     # Close any remaining windows.
     cv2.destroyAllWindows()
-
+    
     print('==> Finshed Demo.')
