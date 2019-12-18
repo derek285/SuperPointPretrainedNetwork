@@ -550,7 +550,8 @@ class VideoStreamer(object):
     def next_frame(self):
         """ Return the next frame, and increment internal counter.
         Returns
-           image: Next H x W image.
+           image: Next H x W image.'''
+           
            status: True or False depending whether image was loaded.
         """
         if self.i == self.maxlen:
@@ -568,7 +569,7 @@ class VideoStreamer(object):
             input_image = input_image.astype('float')/255.0
         else:
             image_file = self.listing[self.i]
-            print("reading " + image_file)
+            # print("reading " + image_file)
             try:
                 input_image = self.read_image(image_file, self.sizer)
             except:
@@ -595,9 +596,9 @@ if __name__ == '__main__':
                         help='Images to skip if input is movie or directory (default: 1).')
     parser.add_argument('--show_extra', action='store_true',
                         help='Show extra debug outputs (default: False).')
-    parser.add_argument('--H', type=int, default=120,
+    parser.add_argument('--H', type=int, default=240,
                         help='Input image height (default: 120).')
-    parser.add_argument('--W', type=int, default=160,
+    parser.add_argument('--W', type=int, default=640,
                         help='Input image width (default:160).')
     parser.add_argument('--display_scale', type=int, default=2,
                         help='Factor to scale output visualization (default: 2).')
@@ -669,11 +670,15 @@ if __name__ == '__main__':
         
         # Get a new image.
         img, status = vs.next_frame()
-
+        
+        print(vs.listing[vs.i - 1])
+        filename = vs.listing[vs.i - 1].split('/')[-1].split('.')[0]
+        # print(filename)
+        
         if status == 0:
             break
         if status == 2:
-            out_f = open(opt.label_dir + "%09d.txt" % (vs.i - 1), 'w')
+            out_f = open(opt.label_dir + filename + ".txt", 'w')
             out_f.close()
             continue
             
@@ -684,12 +689,13 @@ if __name__ == '__main__':
         if not os.path.exists(opt.label_dir):
             os.mkdir(opt.label_dir)
         # print(opt.label_dir +"%09d.txt" % (vs.i-1))
-        out_f = open(opt.label_dir +"%09d.txt" % (vs.i-1), 'w')
+        out_f = open(opt.label_dir + filename + ".txt", 'w')
+        # out_f = open(opt.label_dir +"%09d.txt" % (vs.i-1), 'w')
         for i in range(pts.shape[1]):
             # print(i)
             # print(pts.T[i])
             # print(desc.T[i])
-            out_f.write(str(i) + "," + str(pts.T[i][0]*8) +","+str(pts.T[i][1]*6)+","+str(pts.T[i][2]) + "," +",".join([str(b) for b in desc.T[i]]) + '\n')
+            out_f.write(str(i) + "," + str(pts.T[i][0]*2) +","+str(pts.T[i][1]*3)+","+str(pts.T[i][2]) + "," +",".join([str(b) for b in desc.T[i]]) + '\n')
         out_f.close()
         
         
